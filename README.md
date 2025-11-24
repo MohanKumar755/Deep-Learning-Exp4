@@ -1,203 +1,140 @@
 # Deep-Learning-Exp4
 
-### Implement a Transfer Learning concept in Image Classification
+## **Implement a Transfer Learning concept in Image Classification**
 
-### AIM
+## **AIM**
 
-To develop an image classification model using transfer learning with VGG19 architecture for the given dataset.
+To develop an image classification model using transfer learning with the MobileNetV2 architecture for the CIFAR-10 dataset.
 
-### THEORY
+## **THEORY**
 
-### Neural Network Model
+Transfer Learning is a deep learning approach that reuses a pre-trained model trained on a large dataset (like ImageNet) to solve a new problem with a smaller dataset. Instead of training a neural network from scratch, we “transfer” the learned weights and fine-tune them for the new classification task.
 
+MobileNetV2 is a lightweight CNN designed for mobile and embedded vision applications. It uses depthwise separable convolutions and inverted residual blocks, which significantly reduce the number of parameters while maintaining high accuracy.
 
-<img width="748" height="265" alt="image" src="https://github.com/user-attachments/assets/f6787d28-6a99-4a57-8b1e-55b9b15e88a2" />
+**Advantages of Transfer Learning:**
 
+- Speeds up training by leveraging pre-trained weights.
 
-### DESIGN STEPS
+- Reduces the risk of overfitting on smaller datasets.
 
-STEP 1: We begin by importing the necessary Python libraries, including TensorFlow for deep learning, data preprocessing tools, and visualization libraries.
+- Achieves higher accuracy with fewer data and resources.
 
-STEP 2: To leverage the power of GPU acceleration, we configure TensorFlow to allow GPU processing, which can significantly speed up model training.
+## **DESIGN STEPS**
 
-STEP 3: We load the dataset, consisting of cell images, and check their dimensions. Understanding the image dimensions is crucial for setting up the neural network architecture.
+**STEP 1:**
 
-STEP 4: We create an image generator that performs data augmentation, including rotation, shifting, rescaling, and flipping. Data augmentation enhances the model's ability to generalize and recognize malaria-infected cells in various orientations and conditions.
+Import TensorFlow and Keras libraries required for transfer learning.
 
-STEP 5: We design a convolutional neural network (CNN) architecture consisting of convolutional layers, max-pooling layers, and fully connected layers. The model is compiled with appropriate loss and optimization functions.
+**STEP 2:**
 
-STEP 6: We split the dataset into training and testing sets, and then train the CNN model using the training data. The model learns to differentiate between parasitized and uninfected cells during this phase.
+Load the CIFAR-10 dataset and normalize image pixel values.
 
-STEP 7: We visualize the training and validation loss to monitor the model's learning progress and detect potential overfitting or underfitting.
+**STEP 3:**
 
-STEP 8: We evaluate the trained model's performance using the testing data, generating a classification report and confusion matrix to assess accuracy and potential misclassifications.
+Load the pre-trained MobileNetV2 model (without the top layers) with ImageNet weights.
 
-STEP 9: We demonstrate the model's practical use by randomly selecting and testing a new cell image for classification.
+**STEP 4:**
 
-### PROGRAM
+Freeze the base model layers to retain pre-learned features.
 
-**Name:MOHANKUMAR S**
+**STEP 5:**
 
-**Register Number:2305002014**
+Add new layers for classification — GlobalAveragePooling, Dense, Dropout, and final Softmax.
 
-~~~
+**STEP 6:**
+
+Compile the model using the Adam optimizer and sparse categorical cross-entropy loss.
+
+**STEP 7:**
+
+Train the model for several epochs and validate using the test dataset.
+
+**STEP 8:**
+
+Evaluate the model’s performance and save the trained model for future use.
+
+## **PROGRAM**
+
+**Name:** S MOHANKUMAR
+
+**Register Number:** 2305002014
+
+```python
+
+# Import Libraries
 import tensorflow as tf
-from tensorflow.compat.v1.keras.backend import set_session
-config = tf.compat.v1.ConfigProto()
-config.gpu_options.allow_growth = True # dynamically grow the memory used on the GPU
-config.log_device_placement = True # to log device placement (on which device the operation ran)
-sess = tf.compat.v1.Session(config=config)
-set_session(sess)
+from tensorflow.keras import layers, models
 
-import os
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-from matplotlib.image import imread
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras import utils
-from tensorflow.keras import models
-from sklearn.metrics import classification_report,confusion_matrix
+# Load Dataset
+(train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.cifar10.load_data()
 
-%matplotlib inline
-my_data_dir = 'dataset/cell_images'
-os.listdir(my_data_dir)
-test_path = my_data_dir+'/test/'
-train_path = my_data_dir+'/train/'
+# Normalize the Data
+train_images, test_images = train_images / 255.0, test_images / 255.0
 
-os.listdir(train_path)
-len(os.listdir(train_path+'/uninfected/'))
-len(os.listdir(train_path+'/parasitized/'))
-os.listdir(train_path+'/parasitized')[0]
+# Load Pretrained Model and Modify for Transfer Learning
+base_model = tf.keras.applications.MobileNetV2(
+    input_shape=(32, 32, 3),
+    include_top=False,
+    weights='imagenet'
+)
+base_model.trainable = False  # Freeze the base layers
 
-para_img= imread(train_path+
-                 '/parasitized/'+
-                 os.listdir(train_path+'/parasitized')[0])
+# Build the Model
+model = models.Sequential([
+    base_model,
+    layers.GlobalAveragePooling2D(),
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.3),
+    layers.Dense(10, activation='softmax')
+])
 
-plt.imshow(para_img)
-# Checking the image dimensions
-dim1 = []
-dim2 = []
-for image_filename in os.listdir(test_path+'/uninfected'):
-    img = imread(test_path+'/uninfected'+'/'+image_filename)
-    d1,d2,colors = img.shape
-    dim1.append(d1)
-    dim2.append(d2)
+# Compile the Model
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
 
-sns.jointplot(x=dim1,y=dim2)
+# Train the Model
+history = model.fit(train_images, train_labels,
+                    epochs=5,
+                    validation_data=(test_images, test_labels))
 
-image_shape = (130,130,3)
-# help(ImageDataGenerator)
+# Evaluate the Model
+loss, accuracy = model.evaluate(test_images, test_labels)
+print(f"\nTest Accuracy: {accuracy*100:.2f}%")
 
-image_gen = ImageDataGenerator(rotation_range=20, # rotate the image 20 degrees
-                               width_shift_range=0.10, # Shift the pic width by a max of 5%
-                               height_shift_range=0.10, # Shift the pic height by a max of 5%
-                               rescale=1/255, # Rescale the image by normalzing it.
-                               shear_range=0.1, # Shear means cutting away part of the image (max 10%)
-                               zoom_range=0.1, # Zoom in by 10% max
-                               horizontal_flip=True, # Allo horizontal flipping
-                               fill_mode='nearest' # Fill in missing pixels with the nearest filled value
-                              )
+# Save the Model
+model.save("Transfer_Learning_Model.h5")
+print("\nModel Saved Successfully")
+```
 
-image_gen.flow_from_directory(train_path)
+## **OUTPUT**
 
-image_gen.flow_from_directory(test_path)
+**Epochs Training**
 
+<img width="1227" height="236" alt="image" src="https://github.com/user-attachments/assets/08c529cc-9c0b-43a0-9168-695c72db7b8c" />
 
+---
+**Accuracy**
 
-model = models.Sequential()
-model.add(keras.Input(shape=(image_shape)))
-model.add(layers.Conv2D(filters=16,kernel_size=(3,3),activation='relu',))
-model.add(layers.MaxPooling2D(pool_size=(2, 2)))
+<img width="833" height="50" alt="image" src="https://github.com/user-attachments/assets/e8a7e3bd-4894-41eb-81d1-2170eb29f06a" />
 
-model.add(layers.Conv2D(filters=32, kernel_size=(3,3), activation='relu',))
-model.add(layers.MaxPooling2D(pool_size=(2, 2)))
+---
+**Training Loss, Validation Loss Vs Iteration Plot**
 
-model.add(layers.Conv2D(filters=64, kernel_size=(3,3), activation='relu',))
-model.add(layers.MaxPooling2D(pool_size=(2, 2)))
+<img width="700" height="547" alt="image" src="https://github.com/user-attachments/assets/c6f7846e-599c-4770-887a-2d3cbb173323" />
 
-model.add(layers.Flatten())
+---
+**Confusion Matrix**
 
-model.add(layers.Dense(64,activation='relu'))
-model.add(layers.Dropout(0.5))
-model.add(layers.Dense(1,activation='sigmoid'))
+<img width="853" height="766" alt="image" src="https://github.com/user-attachments/assets/4a17c6bc-0a2f-4cde-9243-cef878395968" />
 
-model.compile(loss='binary_crossentropy',optimizer='adam',metrics=['accuracy'])
+---
+**Classification Report**
 
-model.summary()
-batch_size = 16
-
-# help(image_gen.flow_from_directory)
-
-train_image_gen = image_gen.flow_from_directory(train_path,
-                                               target_size=image_shape[:2],
-                                                color_mode='rgb',
-                                               batch_size=batch_size,
-                                               class_mode='binary')
-
-train_image_gen.batch_size
-len(train_image_gen.classes)
-train_image_gen.total_batches_seen
-test_image_gen = image_gen.flow_from_directory(test_path,
-                                               target_size=image_shape[:2],
-                                               color_mode='rgb',
-                                               batch_size=batch_size,
-                                               class_mode='binary',shuffle=False)
-train_image_gen.class_indices
-results = model.fit(train_image_gen,epochs=5,
-                              validation_data=test_image_gen)
-                             
-model.save('cell_model.h5')
-losses = pd.DataFrame(model.history.history)
-losses[['loss','val_loss']].plot()
-model.metrics_names
-model.evaluate(test_image_gen)
-pred_probabilities = model.predict(test_image_gen)
-test_image_gen.classes
-predictions = pred_probabilities > 0.5
-print(classification_report(test_image_gen.classes,predictions))
-confusion_matrix(test_image_gen.classes,predictions)
+<img width="631" height="446" alt="image" src="https://github.com/user-attachments/assets/e9e7ac42-01bf-4518-a0fc-cfb4fd30aefc" />
 
 
-import random
-list_dir=["Un Infected","parasitized"]
-dir_=(random.choice(list_dir))
-p_img=imread(train_path+'/'+dir_+'/'+os.listdir(train_path+'/'+dir_)[random.randint(0,100)])
-img  = tf.convert_to_tensor(np.asarray(p_img))
-img = tf.image.resize(img,(130,130))
-img=img.numpy()
-pred=bool(model.predict(img.reshape(1,130,130,3))<0.5 )
-plt.title("Model prediction: "+("Parasitized" if pred  else "Un Infected")
-			+"\nActual Value: "+str(dir_))
-plt.axis("off")
-plt.imshow(img)
-plt.show()
-~~~
+## **RESULT**
 
-### OUTPUT
-
-Training Loss, Validation Loss Vs Iteration Plot
-
-<img width="567" height="427" alt="image" src="https://github.com/user-attachments/assets/a43a22c7-c8d2-4c06-921b-a0f852a03d8a" />
-
-### Confusion Matrix
-
-<img width="339" height="103" alt="image" src="https://github.com/user-attachments/assets/1770f890-b079-445e-96b3-63ae473d479c" />
-
-### Classification Report
-
-<img width="582" height="449" alt="image" src="https://github.com/user-attachments/assets/6cbc3d63-48d9-4626-8402-de805c021fcb" />
-
-### New Sample Data Prediction
-
-<img width="760" height="74" alt="image" src="https://github.com/user-attachments/assets/723b7fbe-4aa4-4f7c-b40e-b3f74ef83a7f" />
-<img width="693" height="773" alt="image" src="https://github.com/user-attachments/assets/83dcc067-e5bb-4558-8624-9f5e8dd550ce" />
-
-
-
-### RESULT
-
-The model's performance is evaluated through training and testing, and it shows potential for assisting healthcare professionals in diagnosing malaria more efficiently and accurately
+The transfer learning-based image classification model was successfully implemented using MobileNetV2 on the CIFAR-10 dataset.
